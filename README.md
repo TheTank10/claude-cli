@@ -10,7 +10,7 @@ Python 3.10+
 
 ```bash
 # Clone the repository
-git clone https://github.com/./claude-cli.git
+git clone https://github.com/TheTank10/claude-cli
 cd claude-cli
 
 # Install with pip
