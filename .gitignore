@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+auth.json
+config.json
+notes.txt
+.venv/
