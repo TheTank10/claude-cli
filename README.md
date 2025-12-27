@@ -82,11 +82,14 @@ claude chat prompt # Streams to output with markdown using the rich library
 claude chat "prompt" --raw # Streams to output without markdown 
 claude chat "prompt" > response.md # Streams response to a file
 
-# Sending attachments (only works for source files atm)
+# Sending attachments/files
 claude chat "explain @main.py" 
 claude chat "explain @src/cli/chat.py and @src/__init__.py"
 claude chat "explain @c:\Users\User\OneDrive\Desktop\code\claude-cli\src\cli\chat.py"
 ```
+
+Note: To make uploading files easier add @ then drag and drop the file into your terminal.\
+Most terminals will support this.
 
 **Configure settings:**
 ```bash
@@ -128,7 +131,7 @@ claude history > output.md # Redirect to file
 
 ### High Priority
 - [x] Add conversation history viewer
-- [ ] Support file uploads
+- [x] Support file uploads (Some file types might not work. Some need to be passed through the convert_document endpoint which is not yet implemented.)
 - [ ] Add conversation search/filter
 - [ ] Export conversations to markdown/json
 - [ ] Python API that mimicks offical API (wont release until done)

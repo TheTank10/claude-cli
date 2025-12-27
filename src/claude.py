@@ -1,5 +1,6 @@
 from src.config import USER_AGENT
 from src.file import process_prompt_with_files
+import mimetypes
 
 def get_conversation_count(session, org_id):
     response = session.get(
@@ -28,7 +29,7 @@ def get_conversations(session, org_id, limit=200, starred=False):
 def send_completion(session, org_id, conversation_uuid, prompt, parent_message_uuid, tools=None):
     """Send a completion request and return streaming response"""
     
-    file_result = process_prompt_with_files(prompt)
+    file_result = process_prompt_with_files(prompt, session, org_id)
     
     if tools is None:
         tools = [
@@ -54,7 +55,7 @@ def send_completion(session, org_id, conversation_uuid, prompt, parent_message_u
         "locale": "en-US",
         "tools": tools,
         "attachments": file_result['attachments'],
-        "files": [],
+        "files": file_result['files'],
         "sync_sources": [],
         "rendering_mode": "messages"
     }
@@ -141,3 +142,27 @@ def update_conversation_settings(session, org_id, conversation_uuid, settings):
     }
     body = {"settings": settings}
     return session.put(url, headers=headers, json=body, params={"rendering_mode": "raw"})
+
+def upload_file(session, org_id, file_path):
+    """Upload a binary file and return response"""
+    import os
+    
+    file_name = os.path.basename(file_path)
+    
+    with open(file_path, 'rb') as f:
+        files = {
+            'file': (file_name, f, mimetypes.guess_type(file_path)[0] or 'application/octet-stream')
+        }
+        
+        response = session.post(
+            f"https://claude.ai/api/{org_id}/upload",
+            headers={
+                "User-Agent": USER_AGENT,
+                "accept": "*/*",
+                "referer": "https://claude.ai/new",
+            },
+            files=files,
+            timeout=30
+        )
+    
+    return response
