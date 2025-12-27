@@ -1,4 +1,4 @@
-# claude-cli 0.2.0
+# claude-cli 0.3.0
 
 Unoffical cli for claude
 ---
@@ -81,6 +81,11 @@ claude new --name "My Project"
 claude chat prompt # Streams to output with markdown using the rich library
 claude chat "prompt" --raw # Streams to output without markdown 
 claude chat "prompt" > response.md # Streams response to a file
+
+# Sending attachments (only works for source files atm)
+claude chat "explain @main.py" 
+claude chat "explain @src/cli/chat.py and @src/__init__.py"
+claude chat "explain @c:\Users\User\OneDrive\Desktop\code\claude-cli\src\cli\chat.py"
 ```
 
 **Configure settings:**

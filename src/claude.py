@@ -1,4 +1,5 @@
 from src.config import USER_AGENT
+from src.file import process_prompt_with_files
 
 def get_conversation_count(session, org_id):
     response = session.get(
@@ -27,7 +28,8 @@ def get_conversations(session, org_id, limit=200, starred=False):
 def send_completion(session, org_id, conversation_uuid, prompt, parent_message_uuid, tools=None):
     """Send a completion request and return streaming response"""
     
-    # Default tools if not provided
+    file_result = process_prompt_with_files(prompt)
+    
     if tools is None:
         tools = [
             {"type": "web_search_v0", "name": "web_search"},
@@ -36,7 +38,7 @@ def send_completion(session, org_id, conversation_uuid, prompt, parent_message_u
         ]
     
     body = {
-        "prompt": prompt,
+        "prompt": file_result['prompt'],
         "parent_message_uuid": parent_message_uuid,
         "timezone": "America/New_York",
         "personalized_styles": [{
@@ -50,8 +52,8 @@ def send_completion(session, org_id, conversation_uuid, prompt, parent_message_u
             "isDefault": True
         }],
         "locale": "en-US",
-        "tools": tools,  # Now dynamic!
-        "attachments": [],
+        "tools": tools,
+        "attachments": file_result['attachments'],
         "files": [],
         "sync_sources": [],
         "rendering_mode": "messages"
