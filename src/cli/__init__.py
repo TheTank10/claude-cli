@@ -20,7 +20,7 @@ def test():
 def register_commands():
     from .accounts import accounts, add_account, update_account, switch_account, remove_account
     from .conversations import conversations, new, name, delete, link
-    from .chat import chat, sync
+    from .chat import chat, sync, history
     from .settings import settings
     
     # Account commands
@@ -40,6 +40,7 @@ def register_commands():
     # Chat commands
     cli.add_command(chat)
     cli.add_command(sync)
+    cli.add_command(history)
 
     # Settings commands
     cli.add_command(settings)

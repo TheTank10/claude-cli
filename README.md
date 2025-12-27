@@ -1,4 +1,4 @@
-# claude-cli 0.1.0
+# claude-cli 0.2.0
 
 Unoffical cli for claude
 ---
@@ -107,6 +107,14 @@ Updates local state with latest messages from web.\
 claude delete
 ```
 
+**Get chat history:**
+```bash
+claude history # Last 30 messages with rich markdowns
+claude history 5 # Last x messages 
+claude history --raw # No rich markdowns
+claude history > output.md # Redirect to file
+```
+
 ```claude --help``` for a list of commands
 
 ---
@@ -114,7 +122,7 @@ claude delete
 ## TODO
 
 ### High Priority
-- [ ] Add conversation history viewer
+- [x] Add conversation history viewer
 - [ ] Support file uploads
 - [ ] Add conversation search/filter
 - [ ] Export conversations to markdown/json
