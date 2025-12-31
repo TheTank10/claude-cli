@@ -7,6 +7,7 @@ from src.helpers import (
     get_active_conversation,
     set_active_conversation,
 )
+from src.config import extension_languages as ext_lang
 import src.claude as claude
 
 
@@ -361,3 +362,356 @@ def search(query, output):
                     
     except Exception as e:
         click.echo(f"Error: {e}")
+
+
+@click.command()
+@click.argument('scope', type=click.Choice(['all', 'this', 'choose']), required=False)
+@click.argument('format', type=click.Choice(['json', 'js', 'markdown', 'md']), required=False)
+@click.argument('directory', required=False)
+def export(scope, format, directory):
+    """Export conversations to JSON or Markdown format"""
+    session, org_id = get_active_session()
+    
+    if not session or not org_id:
+        click.echo("No active account. Use 'switch-account' to select one.")
+        return
+    
+    # Interactive mode if no arguments
+    if not scope:
+        click.echo("Export options:\n")
+        click.echo("1) all conversations")
+        click.echo("2) this conversation")
+        click.echo("3) choose conversations")
+        
+        scope_choice = click.prompt("\nEnter option", type=int)
+        
+        if scope_choice not in [1, 2, 3]:
+            click.echo("Invalid option")
+            return
+        
+        scope = ['all', 'this', 'choose'][scope_choice - 1]
+    
+    if not format:
+        click.echo("\n1) json")
+        click.echo("2) markdown")
+        
+        format_choice = click.prompt("\nEnter option", type=int)
+        
+        if format_choice not in [1, 2]:
+            click.echo("Invalid option")
+            return
+        
+        format = 'json' if format_choice == 1 else 'md'
+    
+    # Normalize format
+    if format in ['js', 'json']:
+        format = 'json'
+        file_ext = 'json'
+    else:
+        format = 'md'
+        file_ext = 'md'
+    
+    # Get directory for all/choose modes
+    if scope in ['all', 'choose'] and not directory:
+        directory = click.prompt("Directory name", default="conversations")
+    
+    def sanitize_filename(name):
+        name = name.lower().strip()
+        name = ''.join(c if c.isalnum() or c in ' -_' else '' for c in name)
+        name = '-'.join(name.split())
+        return name[:100] or 'untitled'
+    
+    def format_as_markdown(convo_data):
+        lines = []
+        name = convo_data.get('name', 'Untitled')
+        uuid = convo_data.get('uuid', '')
+        created = convo_data.get('created_at', '')
+        messages = convo_data.get('chat_messages', [])
+
+        def format_timestamp(ts):
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(ts.replace('Z', '+00:00')).astimezone()
+                return dt.strftime('%B %d, %Y at %I:%M %p')
+            except:
+                return ts
+        
+        lines.append(f"# {name}\n")
+        lines.append(f"> **Conversation ID:** `{uuid}`  ")
+        lines.append(f"> **Created:** {format_timestamp(created)}  ")
+        lines.append(f"> **Messages:** {len(messages)}\n")
+        lines.append("---\n")
+        
+        for idx, msg in enumerate(messages, 1):
+            sender = msg.get('sender', 'unknown')
+            timestamp = msg.get('created_at', '')
+            
+            lines.append(f"## {sender.title()} · Message {idx}")
+            lines.append(f"<sub>{format_timestamp(timestamp)}</sub>\n")
+            
+            has_content = False
+            
+            for content in msg.get('content', []):
+                ctype = content.get('type')
+                
+                if ctype == 'text':
+                    text = content.get('text', '').strip()
+                    if text:
+                        lines.append(text + '\n')
+                        has_content = True
+                
+                elif ctype == 'tool_use':
+                    tool = content.get('name', '')
+                    cdata = content.get('input', {})
+                    
+                    if tool == 'artifacts':
+                        art_content = cdata.get('content', '').strip()
+                        
+                        if not art_content:
+                            continue
+                        
+                        title = cdata.get('title', 'Artifact')
+                        art_type = cdata.get('type', '')
+                        command = cdata.get('command', '')
+                        
+                        if command == 'update':
+                            lines.append(f"\n### Artifact Update: {title}\n")
+                        else:
+                            lines.append(f"\n### Artifact: {title}\n")
+                        
+                        lang_map = {
+                            'application/vnd.ant.code': cdata.get('language', ''),
+                            'text/html': 'html',
+                            'application/vnd.ant.react': 'jsx',
+                            'text/markdown': 'markdown',
+                            'image/svg+xml': 'svg',
+                            'application/vnd.ant.mermaid': 'mermaid'
+                        }
+                        lang = lang_map.get(art_type, '')
+                        
+                        if art_type:
+                            lines.append(f"> **Type:** `{art_type}`\n")
+                        
+                        lines.append(f"```{lang}\n{art_content}\n```\n")
+                        has_content = True
+                    
+                    elif tool == 'create_file':
+                        file_text = cdata.get('file_text', '').strip()
+                        
+                        if not file_text:
+                            continue
+                        
+                        path = cdata.get('path', 'unknown')
+                        lang = next((l for ext, l in ext_lang.items() if path.lower().endswith(ext)), '')
+                        
+                        if not lang:
+                            basename = path.split('/')[-1].lower()
+                            if basename in ['dockerfile', 'makefile', 'rakefile']:
+                                lang = basename
+                        
+                        lines.append(f"\n### Created File: `{path}`\n")
+                        lines.append(f"```{lang}\n{file_text}\n```\n")
+                        has_content = True
+                    
+                    elif tool == 'str_replace':
+                        old = cdata.get('old_str', '')
+                        new = cdata.get('new_str', '')
+                        path = cdata.get('path', '')
+                        
+                        if old or new:
+                            lines.append(f"\n### Edit: `{path}`\n")
+                            lines.append(f"```diff\n- {old}\n+ {new}\n```\n")
+                            has_content = True
+                
+                elif ctype == 'tool_result':
+                    tool = content.get('name', '')
+                    
+                    if tool == 'bash_tool':
+                        for rc in content.get('content', []):
+                            if isinstance(rc, dict) and rc.get('type') == 'text':
+                                result_text = rc.get('text', '').strip()
+                                if result_text:
+                                    lines.append(f"\n### Terminal Output\n")
+                                    lines.append(f"```bash\n{result_text}\n```\n")
+                                    has_content = True
+                    
+                    elif tool == 'view':
+                        for rc in content.get('content', []):
+                            if isinstance(rc, dict) and rc.get('type') == 'text':
+                                result_text = rc.get('text', '').strip()
+                                if result_text:
+                                    lines.append(f"\n### File View\n")
+                                    lines.append(f"```\n{result_text}\n```\n")
+                                    has_content = True
+                    
+                    elif tool == 'present_files':
+                        for rc in content.get('content', []):
+                            if isinstance(rc, dict) and (fp := rc.get('file_path')):
+                                try:
+                                    with open(fp, 'r', encoding='utf-8') as f:
+                                        file_data = f.read().strip()
+                                        if file_data:
+                                            lang = next((l for ext, l in ext_lang.items() if fp.lower().endswith(ext)), '')
+                                            lines.append(f"\n### Presented File: `{fp}`\n")
+                                            lines.append(f"```{lang}\n{file_data}\n```\n")
+                                            has_content = True
+                                except:
+                                    pass
+            
+            if not has_content:
+                lines.append("*[No content]*\n")
+            
+            lines.append("\n---\n")
+        
+        return '\n'.join(lines)
+
+    def export_conversation(conv_uuid, conv_name, directory=None):
+        try:
+            response = claude.get_conversation_details(session, org_id, conv_uuid)
+            
+            if response.status_code != 200:
+                click.echo(f"Failed to fetch conversation {conv_uuid[:8]}...")
+                return False
+            
+            convo_data = response.json()
+            filename = sanitize_filename(conv_name or convo_data.get('name', 'untitled'))
+            
+            if directory:
+                filepath = os.path.join(directory, f"{filename}.{file_ext}")
+            else:
+                filepath = f"{filename}.{file_ext}"
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                if format == 'json':
+                    import json
+                    json.dump(convo_data, f, indent=2, ensure_ascii=False)
+                else:
+                    f.write(format_as_markdown(convo_data))
+            
+            return True
+        except Exception as e:
+            click.echo(f"Error exporting {conv_uuid[:8]}: {e}")
+            return False
+    
+    # Handle different scopes
+    if scope == 'this':
+        conversation_uuid = get_active_conversation()
+        
+        if not conversation_uuid:
+            click.echo("No active conversation. Use 'conversations' to select one.")
+            return
+        
+        click.echo("Exporting conversation...")
+        
+        if export_conversation(conversation_uuid, None):
+            click.echo("Export complete!")
+    
+    elif scope == 'all':
+        os.makedirs(directory, exist_ok=True)
+        
+        click.echo("Fetching conversations...")
+        
+        try:
+            response_regular = claude.get_conversations(session, org_id, 1000, starred=False)
+            response_starred = claude.get_conversations(session, org_id, 1000, starred=True)
+            
+            if response_regular.status_code != 200 or response_starred.status_code != 200:
+                click.echo("Failed to fetch conversations")
+                return
+            
+            all_convos = response_regular.json() + response_starred.json()
+            
+            if not all_convos:
+                click.echo("No conversations found.")
+                return
+            
+            click.echo(f"Exporting {len(all_convos)} conversations...\n")
+            
+            success_count = 0
+            with click.progressbar(all_convos, 
+                                label='Exporting',
+                                show_eta=True,
+                                show_percent=True,
+                                item_show_func=lambda c: c.get('name', 'Untitled')[:40] if c else '') as bar:
+                for convo in bar:
+                    conv_uuid = convo.get('uuid', '')
+                    conv_name = convo.get('name', 'Untitled')
+                    
+                    if export_conversation(conv_uuid, conv_name, directory):
+                        success_count += 1
+            
+            click.echo(f"\nExport complete! {success_count}/{len(all_convos)} conversations exported to {directory}/")
+        
+        except Exception as e:
+            click.echo(f"Error: {e}")
+    
+    elif scope == 'choose':
+        click.echo("Fetching conversations...")
+        
+        try:
+            response_regular = claude.get_conversations(session, org_id, 200, starred=False)
+            response_starred = claude.get_conversations(session, org_id, 200, starred=True)
+            
+            if response_regular.status_code != 200 or response_starred.status_code != 200:
+                click.echo("Failed to fetch conversations")
+                return
+            
+            regular_convos = response_regular.json()
+            starred_convos = response_starred.json()
+            
+            if not regular_convos and not starred_convos:
+                click.echo("No conversations found.")
+                return
+            
+            convo_map = {}
+            
+            for i, convo in enumerate(reversed(regular_convos)):
+                index = len(regular_convos) + len(starred_convos) - i
+                name = convo.get('name', 'Untitled')
+                uuid = convo.get('uuid', '')
+                click.echo(f"   {index}) {name} ({uuid[:8]}...)")
+                convo_map[index] = (uuid, name)
+            
+            for i, convo in enumerate(reversed(starred_convos)):
+                index = len(starred_convos) - i
+                name = convo.get('name', 'Untitled')
+                uuid = convo.get('uuid', '')
+                click.echo(f"   {index}) [*] {name} ({uuid[:8]}...)")
+                convo_map[index] = (uuid, name)
+            
+            total = len(regular_convos) + len(starred_convos)
+            click.echo(f"\nTotal: {total} conversations ({len(starred_convos)} starred)")
+            
+            selection_input = click.prompt("\nSelect conversations (comma-separated numbers)", default="")
+            
+            if not selection_input:
+                click.echo("No conversations selected.")
+                return
+            
+            # Parse selection
+            selected_indices = []
+            for part in selection_input.split(','):
+                part = part.strip()
+                if part.isdigit():
+                    selected_indices.append(int(part))
+            
+            if not selected_indices:
+                click.echo("No valid selections.")
+                return
+            
+            # Only create directory after user confirms selection
+            os.makedirs(directory, exist_ok=True)
+            
+            click.echo(f"Exporting {len(selected_indices)} conversations...")
+            
+            success_count = 0
+            for index in selected_indices:
+                if index in convo_map:
+                    conv_uuid, conv_name = convo_map[index]
+                    if export_conversation(conv_uuid, conv_name, directory):
+                        success_count += 1
+            
+            click.echo(f"Export complete! {success_count}/{len(selected_indices)} conversations exported to {directory}/")
+        
+        except Exception as e:
+            click.echo(f"Error: {e}")

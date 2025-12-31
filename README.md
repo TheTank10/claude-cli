@@ -1,4 +1,4 @@
-# claude-cli 0.4.0
+# claude-cli 0.5.0
 
 Unoffical cli for claude
 ---
@@ -130,6 +130,12 @@ claude search "query" > results.txt # Redirects all results to a file
 claude search "query" -o folder # Creates a folder with text files representing results
 ```
 
+**Export conversation/s:**
+```bash
+claude export # Interactive
+claude export this/all/choose js/md directory_name # Dont enter dir name with 'this'
+```
+
 Currently this tool only searches for text found in: text, files, coding artifacts\
 should probably make it search more things later on
 
@@ -144,7 +150,7 @@ should probably make it search more things later on
 - [x] Add conversation history viewer
 - [x] Support file uploads (Some file types might not work. Some need to be passed through the convert_document endpoint which is not yet implemented.)
 - [x] Add conversation search/filter
-- [ ] Export conversations to markdown/json
+- [x] Export conversations to markdown/json
 - [ ] Python API that mimicks offical API (wont release until done)
 - [ ] REPL mode
 
