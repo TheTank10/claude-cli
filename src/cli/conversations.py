@@ -1,5 +1,7 @@
 import click
 import uuid
+import sys, os
+from datetime import datetime
 from src.helpers import (
     get_active_session,
     get_active_conversation,
@@ -213,3 +215,149 @@ def link():
     """Get the link to the active conversation"""
     conversation_uuid = get_active_conversation()
     click.echo(f"https://claude.ai/chat/{conversation_uuid or '???'}")
+
+
+@click.command()
+@click.argument('query', nargs=-1, required=True)
+@click.option('-o', '--output', default=None, help='Output file or folder path')
+def search(query, output):
+    """Search for a phrase in the active conversation"""
+    session, org_id = get_active_session()
+    conversation_uuid = get_active_conversation()
+    
+    if not session or not org_id:
+        return click.echo("No active account. Use 'switch-account' to select one.")
+    if not conversation_uuid:
+        return click.echo("No active conversation. Use 'conversations' to select one.")
+    
+    query_str = " ".join(query)
+    
+    try:
+        response = claude.get_conversation_details(session, org_id, conversation_uuid)
+        
+        if response.status_code != 200:
+            msg = "Authentication failed. Your cookies may have expired.\nRun 'update-account' to refresh your cookies." if response.status_code in [401, 403] else "Failed to fetch conversation"
+            return click.echo(msg)
+        
+        messages = response.json().get('chat_messages', [])
+        matches = []
+        
+        for msg in messages:
+            text_parts, file_contents = [], []
+            
+            for content in msg.get('content', []):
+                ctype, cdata = content.get('type'), content.get('input', {})
+                
+                if ctype == 'text':
+                    text_parts.append(content.get('text', ''))
+                
+                elif ctype == 'tool_use':
+                    tool = content.get('name', '')
+                    
+                    # Artifacts tool 
+                    if tool == 'artifacts':
+                        if art_content := cdata.get('content'):
+                            art_title = cdata.get('title', 'unknown')
+                            file_contents.append(f"\n--- Artifact: {art_title} ---\n{art_content}\n")
+                            text_parts.append(art_content)
+                    
+                    elif tool == 'create_file':
+                        if file_text := cdata.get('file_text'):
+                            file_contents.append(f"\n--- Created File: {cdata.get('path', 'unknown')} ---\n{file_text}\n")
+                            text_parts.append(file_text)
+                    
+                    elif tool == 'str_replace':
+                        old, new = cdata.get('old_str', ''), cdata.get('new_str', '')
+                        if old or new:
+                            text_parts.append(f"[Edit] Old: {old} -> New: {new}")
+                
+                elif ctype == 'tool_result':
+                    tool = content.get('name', '')
+                    
+                    if tool == 'present_files':
+                        for rc in content.get('content', []):
+                            if isinstance(rc, dict) and (fp := rc.get('file_path')):
+                                try:
+                                    with open(fp, 'r', encoding='utf-8') as f:
+                                        file_data = f.read()
+                                        file_contents.append(f"\n--- Presented File: {fp} ---\n{file_data}\n")
+                                        text_parts.append(file_data)
+                                except: pass
+                    
+                    elif tool in ['bash_tool', 'view']:
+                        for rc in content.get('content', []):
+                            if isinstance(rc, dict) and rc.get('type') == 'text':
+                                text_parts.append(rc.get('text', ''))
+            
+            full_text = ' '.join(text_parts)
+            if query_str.lower() in full_text.lower():
+                matches.append({
+                    'msg_uuid': msg.get('uuid'),
+                    'sender': msg.get('sender'),
+                    'timestamp': msg.get('created_at', 'unknown'),
+                    'text': ' '.join(text_parts[:1]) + ('\n' + ''.join(file_contents) if file_contents else ''),
+                    'search_text': full_text,
+                    'index': msg.get('index'),
+                    'match_pos': full_text.lower().find(query_str.lower())
+                })
+        
+        if not matches:
+            return click.echo("No matches found.")
+        
+        # Output handling
+        is_redirected = not sys.stdout.isatty()
+        
+        def format_ts(ts):
+            try:
+                return datetime.fromisoformat(ts.replace('Z', '+00:00')).astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')
+            except:
+                return ts
+        
+        if output or is_redirected:
+            if output and output.endswith('.txt'):
+                with open(output, 'w', encoding='utf-8') as f:
+                    for m in matches:
+                        f.write(f"---\nrole: {m['sender']}\ntimestamp: {format_ts(m.get('timestamp', 'unknown'))}\nuuid: {m['msg_uuid']}\n---\n\n{m['text']}\n\n{'-'*50}\n\n")
+                click.echo(f"Saved {len(matches)} messages to {output}", err=True)
+            elif output:
+                os.makedirs(output, exist_ok=True)
+                for i, m in enumerate(matches):
+                    idx = len(matches) - i  # 1 = most recent
+                    ts = m.get('timestamp', 'unknown')
+                    try:
+                        dt = datetime.fromisoformat(ts.replace('Z', '+00:00')).astimezone()
+                        time_str = dt.strftime('%Y-%m-%d_%H-%M-%S')
+                        formatted_ts = dt.strftime('%Y-%m-%d %H:%M:%S %Z')
+                    except:
+                        time_str = 'unknown'
+                        formatted_ts = ts
+                    with open(os.path.join(output, f"{idx}_{m['sender']}_{time_str}.txt"), 'w', encoding='utf-8') as f:
+                        f.write(f"---\nrole: {m['sender']}\ntimestamp: {formatted_ts}\nuuid: {m['msg_uuid']}\n---\n\n{m['text']}")
+                click.echo(f"Saved {len(matches)} messages to {output}/", err=True)
+            else:
+                for m in matches:
+                    click.echo(f"---\nrole: {m['sender']}\ntimestamp: {format_ts(m.get('timestamp', 'unknown'))}\nuuid: {m['msg_uuid']}\n---\n\n{m['text']}\n\n{'-'*50}\n")
+        else:
+            # Interactive mode
+            while True:
+                for i, m in enumerate(matches):
+                    idx = len(matches) - i
+                    pos = m['match_pos']
+                    txt = m['search_text']
+                    start, end = max(0, pos - 30), min(len(txt), pos + len(query_str) + 70)
+                    preview = ('...' if start > 0 else '') + txt[start:end].replace('\n', ' ') + ('...' if end < len(txt) else '')
+                    click.echo(f"{idx}) [{m['sender']}] {preview}")
+                
+                selection = click.prompt("\nLoad (enter index or press Enter to exit)", default="", show_default=False)
+                
+                if not selection:
+                    break
+                
+                if selection.isdigit() and 1 <= int(selection) <= len(matches):
+                    m = matches[int(selection) - 1]
+                    click.echo(f"\n---\nrole: {m['sender']}\ntimestamp: {format_ts(m.get('timestamp', 'unknown'))}\nuuid: {m['msg_uuid']}\n---\n\n{m['text']}\n")
+                else:
+                    click.echo("Invalid index" if selection.isdigit() else "Please enter a number")
+                    
+    except Exception as e:
+        click.echo(f"Error: {e}")

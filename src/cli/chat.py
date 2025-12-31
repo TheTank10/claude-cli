@@ -138,6 +138,7 @@ def format_tool_use(tool_name, tool_input):
 @click.option('--output', '-o', type=click.Path(), help='Save output to file')
 @click.option('--raw', is_flag=True, help='Output raw markdown without formatting')
 def chat(text, output, raw):
+    """Send a message to the active conversation."""
     auth = get_auth_context()
     if not auth:
         return
@@ -319,6 +320,7 @@ def chat(text, output, raw):
 
 @click.command()
 def sync():
+    """Sync the active conversation with claude."""
     session, org_id = get_active_session()
     conversation_uuid = get_active_conversation()
     
@@ -371,6 +373,7 @@ def sync():
 @click.option('--output', '-o', type=click.Path(), help='Save output to file')
 @click.option('--raw', is_flag=True, help='Output raw markdown without formatting')
 def history(limit, output, raw):
+    """View chat history of the active conversation."""
     auth = get_auth_context()
     if not auth:
         return

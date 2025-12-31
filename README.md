@@ -1,4 +1,4 @@
-# claude-cli 0.3.0
+# claude-cli 0.4.0
 
 Unoffical cli for claude
 ---
@@ -110,7 +110,7 @@ claude sync
 Updates local state with latest messages from web.\
 ⚠️ Important: If you talk to claude on your browser and come back later to the cli and don't sync the conversations it will remove the history up to the last chat claude sent through the cli
 
-**Delete conversation:**
+**Delete current conversation:**
 ```bash
 claude delete
 ```
@@ -123,6 +123,17 @@ claude history --raw # No rich markdowns
 claude history > output.md # Redirect to file
 ```
 
+**Search current conversation:**
+```bash
+claude search query # Shows interactively
+claude search "query" > results.txt # Redirects all results to a file
+claude search "query" -o folder # Creates a folder with text files representing results
+```
+
+Currently this tool only searches for text found in: text, files, coding artifacts\
+should probably make it search more things later on
+
+
 ```claude --help``` for a list of commands
 
 ---
@@ -132,7 +143,7 @@ claude history > output.md # Redirect to file
 ### High Priority
 - [x] Add conversation history viewer
 - [x] Support file uploads (Some file types might not work. Some need to be passed through the convert_document endpoint which is not yet implemented.)
-- [ ] Add conversation search/filter
+- [x] Add conversation search/filter
 - [ ] Export conversations to markdown/json
 - [ ] Python API that mimicks offical API (wont release until done)
 - [ ] REPL mode
