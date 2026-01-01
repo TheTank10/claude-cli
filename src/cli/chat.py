@@ -133,27 +133,11 @@ def format_tool_use(tool_name, tool_input):
         return ""
 
 
-@click.command()
-@click.argument('text', nargs=-1, required=True)
-@click.option('--output', '-o', type=click.Path(), help='Save output to file')
-@click.option('--raw', is_flag=True, help='Output raw markdown without formatting')
-def chat(text, output, raw):
-    """Send a message to the active conversation."""
-    auth = get_auth_context()
-    if not auth:
-        return
-    
-    session, org_id, conversation_uuid = auth
-    parent_message_uuid = get_parent_message_uuid()
-    prompt = " ".join(text)
-    use_raw = raw or output or not sys.stdout.isatty()
-    
-    settings = get_conversation_settings()
-    if settings is None:
-        response = claude.get_conversation_details(session, org_id, conversation_uuid)
-        settings = response.json().get('settings', DEFAULT_SETTINGS) if response.status_code == 200 else DEFAULT_SETTINGS
-        set_active_conversation(conversation_uuid, parent_message_uuid, settings)
-    
+def send_message(prompt, session, org_id, conversation_uuid, parent_message_uuid, settings, use_raw=False, output_file=None):
+    """
+    Core function to send a message and stream the response.
+    Returns (markdown_buffer, new_message_uuid) or (None, None) on error.
+    """
     tools = build_tools(settings)
     
     try:
@@ -161,7 +145,7 @@ def chat(text, output, raw):
         
         if response.status_code != 200:
             console.print(f"Failed to send message (status code: {response.status_code})", style="red")
-            return
+            return None, None
         
         markdown_buffer = ""
         new_message_uuid = None
@@ -306,16 +290,128 @@ def chat(text, output, raw):
         if use_raw:
             click.echo()
         
-        if output:
-            with open(output, 'w', encoding='utf-8') as f:
+        if output_file:
+            with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(markdown_buffer)
-            click.echo(f"Output saved to {output}", err=True)
+            click.echo(f"Output saved to {output_file}", err=True)
         
-        if new_message_uuid:
-            set_active_conversation(conversation_uuid, new_message_uuid)
+        return markdown_buffer, new_message_uuid
     
     except Exception as e:
         console.print(f"Error: {e}", style="red")
+        return None, None
+
+
+@click.command()
+@click.argument('text', nargs=-1, required=True)
+@click.option('--output', '-o', type=click.Path(), help='Save output to file')
+@click.option('--raw', is_flag=True, help='Output raw markdown without formatting')
+def chat(text, output, raw):
+    """Send a message to the active conversation."""
+    auth = get_auth_context()
+    if not auth:
+        return
+    
+    session, org_id, conversation_uuid = auth
+    parent_message_uuid = get_parent_message_uuid()
+    prompt = " ".join(text)
+    use_raw = raw or output or not sys.stdout.isatty()
+    
+    settings = get_conversation_settings()
+    if settings is None:
+        response = claude.get_conversation_details(session, org_id, conversation_uuid)
+        settings = response.json().get('settings', DEFAULT_SETTINGS) if response.status_code == 200 else DEFAULT_SETTINGS
+        set_active_conversation(conversation_uuid, parent_message_uuid, settings)
+    
+    markdown_buffer, new_message_uuid = send_message(
+        prompt, session, org_id, conversation_uuid, 
+        parent_message_uuid, settings, use_raw, output
+    )
+    
+    if new_message_uuid:
+        set_active_conversation(conversation_uuid, new_message_uuid)
+
+
+@click.command()
+@click.option('--raw', is_flag=True, help='Output raw markdown without formatting')
+def repl(raw):
+    """Start an interactive chat session with Claude."""
+    auth = get_auth_context()
+    if not auth:
+        return
+    
+    session, org_id, conversation_uuid = auth
+    parent_message_uuid = get_parent_message_uuid()
+    use_raw = raw or not sys.stdout.isatty()
+    
+    settings = get_conversation_settings()
+    if settings is None:
+        response = claude.get_conversation_details(session, org_id, conversation_uuid)
+        settings = response.json().get('settings', DEFAULT_SETTINGS) if response.status_code == 200 else DEFAULT_SETTINGS
+        set_active_conversation(conversation_uuid, parent_message_uuid, settings)
+    
+    if not use_raw:
+        console.print("\n[bold cyan]Claude REPL[/bold cyan]")
+        console.print("Type your message and press Enter. Type 'exit', 'quit', or press Ctrl+C to quit.\n")
+    else:
+        click.echo("\nClaude REPL - Type 'exit' or 'quit' to quit.\n")
+    
+    try:
+        while True:
+            try:
+                if use_raw:
+                    click.echo("> ", nl=False)
+                    user_input = input()
+                else:
+                    user_input = console.input("[bold cyan]>[/bold cyan] ")
+                
+                if not user_input.strip():
+                    continue
+                
+                if user_input.strip().lower() in ['exit', 'quit', '/exit', '/quit']:
+                    if not use_raw:
+                        console.print("\n[dim]Goodbye![/dim]")
+                    else:
+                        click.echo("\nGoodbye!")
+                    break
+                
+                if use_raw:
+                    click.echo("\nClaude:\n")
+                else:
+                    console.print("\n[bold green]Claude:[/bold green]")
+                
+                markdown_buffer, new_message_uuid = send_message(
+                    user_input, session, org_id, conversation_uuid,
+                    parent_message_uuid, settings, use_raw
+                )
+                
+                if new_message_uuid:
+                    parent_message_uuid = new_message_uuid
+                    set_active_conversation(conversation_uuid, new_message_uuid)
+                else:
+                    # If we failed to send, break out
+                    break
+                
+                if use_raw:
+                    click.echo()
+                else:
+                    console.print()
+            
+            except EOFError:
+                if not use_raw:
+                    console.print("\n[dim]Goodbye![/dim]")
+                else:
+                    click.echo("\nGoodbye!")
+                break
+            except KeyboardInterrupt:
+                if not use_raw:
+                    console.print("\n[dim]Goodbye![/dim]")
+                else:
+                    click.echo("\nGoodbye!")
+                break
+    
+    except Exception as e:
+        console.print(f"\nError: {e}", style="red")
 
 
 @click.command()

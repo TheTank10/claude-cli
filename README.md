@@ -1,6 +1,7 @@
-# claude-cli 0.5.0
+# unoffical claude-cli 0.6.0
 
-Unoffical cli for claude
+![Claude CLI REPL](src/cli/repl_showcase.png)
+
 ---
 
 ### Install
@@ -88,6 +89,14 @@ claude chat "explain @src/cli/chat.py and @src/__init__.py"
 claude chat "explain @c:\Users\User\OneDrive\Desktop\code\claude-cli\src\cli\chat.py"
 ```
 
+** REPL mode:**
+
+```bash
+# Works just like claude chat except its interactive
+claude repl
+claude repl --raw
+```
+
 Note: To make uploading files easier add @ then drag and drop the file into your terminal.\
 Most terminals will support this.
 
@@ -130,15 +139,14 @@ claude search "query" > results.txt # Redirects all results to a file
 claude search "query" -o folder # Creates a folder with text files representing results
 ```
 
+Currently this tool only searches for text found in: text, files, coding artifacts\
+should probably make it search more things later on
+
 **Export conversation/s:**
 ```bash
 claude export # Interactive
 claude export this/all/choose js/md directory_name # Dont enter dir name with 'this'
 ```
-
-Currently this tool only searches for text found in: text, files, coding artifacts\
-should probably make it search more things later on
-
 
 ```claude --help``` for a list of commands
 
@@ -152,7 +160,7 @@ should probably make it search more things later on
 - [x] Add conversation search/filter
 - [x] Export conversations to markdown/json
 - [ ] Python API that mimicks offical API (wont release until done)
-- [ ] REPL mode
+- [x] REPL mode
 
 ### Mid Priority
 - [ ] Styles
