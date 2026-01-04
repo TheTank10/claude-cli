@@ -1,6 +1,6 @@
-# unoffical claude-cli 0.7.2
+# unoffical claude-cli 0.7.3
 
-![Claude CLI REPL](src/cli/repl_showcase.png)
+![Claude CLI REPL](https://raw.githubusercontent.com/TheTank10/claude-cli/refs/heads/main/src/cli/repl_showcase.png)
 
 ---
 
@@ -8,7 +8,7 @@
 
 No offical package yet\
 Python 3.10+\
-[API Documentation](API.md)
+[API Documentation](https://github.com/TheTank10/claude-cli/blob/main/API.md)
 
 ```bash
 pip install unofficial-claude-cli
@@ -153,7 +153,7 @@ claude export this/all/choose js/md directory_name # Dont enter dir name with 't
 - [x] Support file uploads (Some file types might not work. Some need to be passed through the convert_document endpoint which is not yet implemented.)
 - [x] Add conversation search/filter
 - [x] Export conversations to markdown/json
-- [x] [Python API](API.md)
+- [x] [Python API](https://github.com/TheTank10/claude-cli/blob/main/API.md)
 - [x] REPL mode
 
 ### Mid Priority

@@ -9,7 +9,7 @@ def read_long_description():
 
 setup(
     name="unofficial-claude-cli",
-    version="0.7.2",
+    version="0.7.3",
     
     author="TheTank10",
     
