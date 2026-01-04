@@ -4,10 +4,21 @@ import os
 import re
 import requests
 from pathlib import Path
-import src.claude as claude
+from . import claude
 
-AUTH_FILE = "auth.json"
-CONFIG_FILE = "config.json"
+def get_config_dir():
+    """Get the config directory for claude-cli"""
+    if os.name == 'nt':  # Windows
+        base = os.environ.get('APPDATA', os.path.expanduser('~'))
+        config_dir = os.path.join(base, 'claude-cli')
+    else:  # Linux/Mac
+        config_dir = os.path.expanduser('~/.claude-cli')
+
+    os.makedirs(config_dir, exist_ok=True)
+    return config_dir
+
+AUTH_FILE = os.path.join(get_config_dir(), "auth.json")
+CONFIG_FILE = os.path.join(get_config_dir(), "config.json")
 
 def create_session_from_cookies(cookie_string):
     """Create a requests session with cookies"""

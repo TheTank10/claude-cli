@@ -1,5 +1,5 @@
 import click
-from src.helpers import (
+from ..helpers import (
     load_accounts,
     save_accounts,
     verify_and_save_account,
@@ -9,7 +9,7 @@ from src.helpers import (
     create_session_from_cookies,
     extract_org_id,
 )
-import src.claude as claude
+from .. import claude
 
 
 @click.command()

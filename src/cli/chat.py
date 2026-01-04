@@ -5,14 +5,14 @@ from rich.live import Live
 import json as json_lib
 import re
 import sys
-from src.helpers import (
+from ..helpers import (
     get_active_session,
     get_active_conversation,
     set_active_conversation,
     get_parent_message_uuid,
     get_conversation_settings,
 )
-import src.claude as claude
+from .. import claude
 
 console = Console()
 

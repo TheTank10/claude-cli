@@ -1,11 +1,11 @@
 import click
-from src.helpers import (
+from ..helpers import (
     get_active_session,
     get_active_conversation,
     set_active_conversation,
     get_parent_message_uuid,
 )
-import src.claude as claude
+from .. import claude
 
 
 @click.command()

@@ -103,7 +103,7 @@ def resolve_file_path(file_path):
 
 def process_prompt_with_files(prompt, session, org_id):
     """Process prompt to extract @file references and create attachments/uploads"""
-    from src.claude import upload_file
+    from .claude import upload_file
     
     file_refs = find_file_references(prompt)
     

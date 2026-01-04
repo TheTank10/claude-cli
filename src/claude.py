@@ -1,5 +1,5 @@
-from src.config import USER_AGENT
-from src.file import process_prompt_with_files
+from .config import USER_AGENT
+from .file import process_prompt_with_files
 import mimetypes
 
 def get_conversation_count(session, org_id):

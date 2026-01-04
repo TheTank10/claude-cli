@@ -6,3 +6,7 @@ auth.json
 config.json
 notes.txt
 .venv/
+test.py
+dist/
+build/
+error.txt

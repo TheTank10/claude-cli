@@ -2,13 +2,13 @@ import click
 import uuid
 import sys, os
 from datetime import datetime
-from src.helpers import (
+from ..helpers import (
     get_active_session,
     get_active_conversation,
     set_active_conversation,
 )
-from src.config import extension_languages as ext_lang
-import src.claude as claude
+from ..config import extension_languages as ext_lang
+from .. import claude
 
 
 @click.command()
