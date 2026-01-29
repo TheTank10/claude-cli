@@ -5,8 +5,6 @@
 ---
 
 ### Install
-
-No offical package yet\
 Python 3.10+\
 [API Documentation](https://github.com/TheTank10/claude-cli/blob/main/API.md)
 
@@ -83,7 +81,7 @@ claude chat "explain @src/cli/chat.py and @src/__init__.py"
 claude chat "explain @c:\Users\User\OneDrive\Desktop\code\claude-cli\src\cli\chat.py"
 ```
 
-** REPL mode:**
+**REPL mode:**
 
 ```bash
 # Works just like claude chat except its interactive
